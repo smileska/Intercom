@@ -30,14 +30,14 @@ Then open http://127.0.0.1:8000.
 
 The seeder creates a handful of users. The password for all of them is `password`.
 
-| Email               | Role     |
-| ------------------- | -------- |
-| admin@company.test  | admin    |
-| marko@company.test  | employee |
-| ivana@company.test  | employee |
-| stefan@company.test | employee |
-| elena@company.test  | employee |
-| nikola@company.test | employee |
+| Email                  | Role     |
+| ---------------------- | -------- |
+| admin@company.test     | admin    |
+| korisnik1@company.test | employee |
+| korisnik2@company.test | employee |
+| korisnik3@company.test | employee |
+| korisnik4@company.test | employee |
+| korisnik5@company.test | employee |
 
 `#general`, `#random` and `#razvoj` are public channels; `#menadzment` is private.
 Anyone who registers is added to every public channel automatically.

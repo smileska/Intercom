@@ -15,7 +15,7 @@ class CompanySeeder extends Seeder
     public function run(): void
     {
         $admin = User::create([
-            'name' => 'Ана Ана Admin',
+            'name' => 'admin',
             'email' => 'admin@company.test',
             'password' => Hash::make('password'),
             'role' => 'admin',
@@ -26,11 +26,11 @@ class CompanySeeder extends Seeder
         ]);
 
         $employees = collect([
-            ['name' => 'Марко Марковски', 'email' => 'marko@company.test', 'title' => 'Backend Developer', 'color' => '#1264A3', 'bio' => 'Laravel / PHP. Кафе задолжително пред 10ч.'],
-            ['name' => 'Ивана Иванова', 'email' => 'ivana@company.test', 'title' => 'Frontend Developer', 'color' => '#007A5A', 'bio' => 'Vue, Tailwind, дизајн системи.'],
-            ['name' => 'Стефан Стефановски', 'email' => 'stefan@company.test', 'title' => 'Project Manager', 'color' => '#E01E5A', 'bio' => 'Ако имаш прашање за рокови — јас сум тука.'],
-            ['name' => 'Елена Петровска', 'email' => 'elena@company.test', 'title' => 'HR Specialist', 'color' => '#ECB22E', 'bio' => 'Луѓе, договори, боледувања, тимбилдинзи.'],
-            ['name' => 'Никола Николовски', 'email' => 'nikola@company.test', 'title' => 'QA Engineer', 'color' => '#1264A3', 'bio' => 'Ако падне — јас го скршив, но со причина.'],
+            ['name' => 'korisnik1', 'email' => 'korisnik1@company.test', 'title' => 'Backend Developer', 'color' => '#1264A3', 'bio' => 'Laravel / PHP. Кафе задолжително пред 10ч.'],
+            ['name' => 'korisnik2', 'email' => 'korisnik2@company.test', 'title' => 'Frontend Developer', 'color' => '#007A5A', 'bio' => 'Vue, Tailwind, дизајн системи.'],
+            ['name' => 'korisnik3', 'email' => 'korisnik3@company.test', 'title' => 'Project Manager', 'color' => '#E01E5A', 'bio' => 'Ако имаш прашање за рокови — јас сум тука.'],
+            ['name' => 'korisnik4', 'email' => 'korisnik4@company.test', 'title' => 'HR Specialist', 'color' => '#ECB22E', 'bio' => 'Луѓе, договори, боледувања, тимбилдинзи.'],
+            ['name' => 'korisnik5', 'email' => 'korisnik5@company.test', 'title' => 'QA Engineer', 'color' => '#1264A3', 'bio' => 'Ако падне — јас го скршив, но со причина.'],
         ])->map(function ($data) {
             return User::create([
                 'name' => $data['name'],
