@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\ChatController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/chat');
@@ -16,4 +17,8 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+
+    Route::get('/chat', [ChatController::class, 'index'])->name('chat');
+    Route::get('/chat/channel/{channel}', [ChatController::class, 'index'])->name('chat.channel');
+    Route::get('/chat/dm/{user}', [ChatController::class, 'index'])->name('chat.dm');
 });
