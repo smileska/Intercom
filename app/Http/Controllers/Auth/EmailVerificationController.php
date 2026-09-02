@@ -7,7 +7,6 @@ use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 
 class EmailVerificationController extends Controller
@@ -19,18 +18,7 @@ class EmailVerificationController extends Controller
             return redirect()->intended(RouteServiceProvider::HOME);
         }
 
-        $devLink = app()->environment('local')
-            ? URL::temporarySignedRoute(
-                'verification.verify',
-                now()->addMinutes(60),
-                [
-                    'id' => $request->user()->getKey(),
-                    'hash' => sha1($request->user()->getEmailForVerification()),
-                ]
-            )
-            : null;
-
-        return view('auth.verify-email', ['devLink' => $devLink]);
+        return view('auth.verify-email');
     }
 
     public function verify(EmailVerificationRequest $request): RedirectResponse

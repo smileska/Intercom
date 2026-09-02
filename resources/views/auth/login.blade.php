@@ -43,9 +43,4 @@
     <p class="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
         Немаш профил? <a href="{{ route('register') }}" class="text-[#4A154B] font-medium dark:text-purple-300">Регистрирај се</a>
     </p>
-
-    <div class="mt-6 rounded-md bg-gray-50 p-3 text-xs text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-        Демо профили (лозинка за сите: <code>password</code>):<br>
-        admin@company.test, marko@company.test, ivana@company.test
-    </div>
 </x-auth-card>

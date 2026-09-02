@@ -12,17 +12,7 @@
         </div>
     @elseif (session('status') === 'verification-link-failed')
         <div class="mt-4 rounded-md bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/40 dark:text-red-300">
-            Не успеавме да ја испратиме е-поштата (проблем со mail серверот). Обиди се повторно подоцна
-            @if ($devLink) или искористи ја врската подолу @endif.
-        </div>
-    @endif
-
-    @if ($devLink)
-        <div class="mt-4 rounded-md border border-dashed border-amber-400 bg-amber-50 p-3 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-            <p class="font-semibold mb-1">Локален режим (без вистински mailer)</p>
-            <a href="{{ $devLink }}" class="break-all text-[#4A154B] underline dark:text-purple-300">
-                Потврди ја е-поштата сега →
-            </a>
+            Не успеавме да ја испратиме е-поштата (проблем со mail серверот). Обиди се повторно подоцна.
         </div>
     @endif
 
