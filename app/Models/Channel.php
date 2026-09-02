@@ -41,6 +41,11 @@ class Channel extends Model
         return $this->hasMany(Message::class)->orderBy('created_at');
     }
 
+    public function memberSuggestions(): HasMany
+    {
+        return $this->hasMany(ChannelMemberSuggestion::class);
+    }
+
     public function hasMember(int $userId): bool
     {
         return $this->users()->where('users.id', $userId)->exists();
