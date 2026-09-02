@@ -74,10 +74,16 @@
                         <li>
                             <button
                                 wire:click="selectChannel({{ $channel->id }})"
-                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm truncate
+                                class="w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm
                                        {{ $activeType === 'channel' && $activeChannelId === $channel->id ? 'bg-[#1164A3] text-white' : 'hover:bg-white/10 text-gray-200' }}">
                                 <span>{{ $channel->is_private ? '🔒' : '#' }}</span>
                                 <span class="truncate">{{ $channel->name }}</span>
+                                @if ($pendingByChannel->get($channel->id, 0) > 0)
+                                    <span class="ml-auto inline-flex min-w-[1.25rem] justify-center rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
+                                          title="Предлози за членство на чекање">
+                                        {{ $pendingByChannel->get($channel->id) }}
+                                    </span>
+                                @endif
                             </button>
                         </li>
                     @endforeach
@@ -144,16 +150,22 @@
 
     <main class="flex-1 flex flex-col bg-white min-w-0 dark:bg-gray-900">
         @if ($activeType === 'channel' && $openChannel)
-            <header class="px-6 py-3 border-b flex items-center justify-between dark:border-gray-700">
-                <div>
+            <header class="px-6 py-3 border-b flex items-center justify-between gap-3 dark:border-gray-700">
+                <div class="min-w-0">
                     <h2 class="font-semibold text-gray-800 dark:text-gray-100"># {{ $openChannel->name }}</h2>
                     @if ($openChannel->description)
                         <p class="text-xs text-gray-500 dark:text-gray-400">{{ $openChannel->description }}</p>
                     @endif
                 </div>
-                @if ($openChannel->is_private)
-                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800 dark:text-gray-400">🔒 приватен канал</span>
-                @endif
+                <div class="flex items-center gap-2 shrink-0">
+                    @if ($openChannel->is_private)
+                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800 dark:text-gray-400">🔒 приватен канал</span>
+                    @endif
+                    <button wire:click="openChannelMembers({{ $openChannel->id }})"
+                            class="text-xs rounded-md border border-gray-300 px-2.5 py-1 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                        👥 Членови
+                    </button>
+                </div>
             </header>
         @elseif ($activeType === 'dm' && $openUser)
             <header class="px-6 py-3 border-b flex items-center gap-2 dark:border-gray-700">
@@ -296,6 +308,83 @@
         </div>
     @endif
 
+    @if ($showChannelMembers && $membersChannel)
+        <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" wire:click.self="closeChannelMembers">
+            <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto dark:bg-gray-800">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-gray-800 dark:text-gray-100">
+                        {{ $membersChannel->is_private ? '🔒' : '#' }} {{ $membersChannel->name }} · Членови
+                    </h3>
+                    <button wire:click="closeChannelMembers" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl">✕</button>
+                </div>
+
+                @error('members') <p class="mb-3 text-xs text-red-600">{{ $message }}</p> @enderror
+
+                <ul class="space-y-1 mb-5">
+                    @foreach ($memberRows as $member)
+                        <li class="flex items-center gap-2 text-sm">
+                            <x-avatar :user="$member" class="h-6 w-6 text-[10px]" />
+                            <span class="truncate text-gray-700 dark:text-gray-200">{{ $member->name }}</span>
+                            @if ($member->id === $membersChannel->created_by)
+                                <span class="text-[10px] text-gray-400">(креатор)</span>
+                            @endif
+                            @if (auth()->user()->isAdmin() && $member->id !== $membersChannel->created_by)
+                                <button wire:click="removeChannelMember({{ $member->id }})"
+                                        class="ml-auto text-gray-400 hover:text-red-600" title="Отстрани од каналот">✕</button>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+
+                @if (auth()->user()->isAdmin() && $pendingSuggestions->isNotEmpty())
+                    <div class="mb-5">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Предлози на чекање</p>
+                        <ul class="space-y-2">
+                            @foreach ($pendingSuggestions as $suggestion)
+                                <li class="flex items-center gap-2 text-sm">
+                                    <x-avatar :user="$suggestion->user" class="h-6 w-6 text-[10px]" />
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-gray-700 dark:text-gray-200">{{ $suggestion->user->name }}</span>
+                                        <span class="block text-[10px] text-gray-400">предложи {{ $suggestion->suggestedBy->name }}</span>
+                                    </span>
+                                    <span class="ml-auto flex gap-1">
+                                        <button wire:click="approveSuggestion({{ $suggestion->id }})"
+                                                class="rounded bg-green-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-green-700">Одобри</button>
+                                        <button wire:click="rejectSuggestion({{ $suggestion->id }})"
+                                                class="rounded bg-gray-200 px-2 py-1 text-[11px] font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200">Одбиј</button>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
+                @if ($candidates->isNotEmpty())
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                        {{ auth()->user()->isAdmin() ? 'Додади членови' : 'Предложи членови' }}
+                    </p>
+                    <ul class="space-y-1 max-h-52 overflow-y-auto">
+                        @foreach ($candidates as $person)
+                            <li class="flex items-center gap-2 text-sm">
+                                <x-avatar :user="$person" class="h-6 w-6 text-[10px]" />
+                                <span class="truncate text-gray-700 dark:text-gray-200">{{ $person->name }}</span>
+                                @if (auth()->user()->isAdmin())
+                                    <button wire:click="addChannelMember({{ $person->id }})"
+                                            class="ml-auto rounded bg-[#4A154B] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#3a1039]">Додади</button>
+                                @elseif (in_array($person->id, $suggestedUserIds))
+                                    <span class="ml-auto text-[11px] text-gray-400">Предложено</span>
+                                @else
+                                    <button wire:click="suggestMember({{ $person->id }})"
+                                            class="ml-auto rounded border border-[#4A154B] px-2 py-1 text-[11px] font-medium text-[#4A154B] hover:bg-[#4A154B]/10 dark:border-purple-400 dark:text-purple-300">Предложи</button>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+        </div>
+    @endif
+
     @if ($showProfile && $profile)
         <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" wire:click.self="closeProfile">
             <div class="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-gray-800">
@@ -344,6 +433,19 @@
                             </button>
                         @endif
                     </div>
+
+                    @if (auth()->user()->isAdmin() && $profile->id !== auth()->id())
+                        <div class="mt-3">
+                            <button wire:click="toggleAdmin({{ $profile->id }})"
+                                    class="w-full rounded-md border px-4 py-2 text-sm font-medium
+                                           {{ $profile->isAdmin()
+                                              ? 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-500/50 dark:text-red-400 dark:hover:bg-red-900/20'
+                                              : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700' }}">
+                                {{ $profile->isAdmin() ? 'Отстрани од администратори' : 'Направи администратор' }}
+                            </button>
+                            @error('role') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>

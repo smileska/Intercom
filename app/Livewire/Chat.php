@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Channel;
+use App\Models\ChannelMemberSuggestion;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
@@ -68,6 +69,10 @@ class Chat extends Component
 
     public int $notifiedThroughId = 0;
 
+    public bool $showChannelMembers = false;
+
+    public ?int $membersChannelId = null;
+
     public function mount(?Channel $initialChannel = null, ?User $initialUser = null): void
     {
         $this->notifiedThroughId = (int) (Message::whereNotNull('receiver_id')
@@ -97,11 +102,17 @@ class Chat extends Component
 
     protected function canAccessChannel(Channel $channel): bool
     {
-        return ! $channel->is_private || $channel->hasMember(Auth::id());
+        return Auth::user()->isAdmin()
+            || ! $channel->is_private
+            || $channel->hasMember(Auth::id());
     }
 
     public function visibleChannels()
     {
+        if (Auth::user()->isAdmin()) {
+            return Channel::orderBy('name')->get();
+        }
+
         return Channel::query()
             ->where(function ($q) {
                 $q->where('is_private', false)
@@ -385,6 +396,171 @@ class Chat extends Component
         $this->selectChannel($channel->id);
     }
 
+    public function toggleAdmin(int $userId): void
+    {
+        if (! Auth::user()->isAdmin() || $userId === Auth::id()) {
+            return;
+        }
+
+        $user = User::findOrFail($userId);
+
+        if ($user->isAdmin() && User::where('role', 'admin')->count() <= 1) {
+            $this->addError('role', 'Мора да остане барем еден администратор.');
+
+            return;
+        }
+
+        $user->update(['role' => $user->isAdmin() ? 'employee' : 'admin']);
+        $this->resetValidation('role');
+    }
+
+    public function openChannelMembers(int $channelId): void
+    {
+        $channel = Channel::findOrFail($channelId);
+
+        if (! $this->canAccessChannel($channel)) {
+            return;
+        }
+
+        $this->membersChannelId = $channelId;
+        $this->showChannelMembers = true;
+        $this->resetValidation();
+    }
+
+    public function closeChannelMembers(): void
+    {
+        $this->showChannelMembers = false;
+        $this->membersChannelId = null;
+    }
+
+    protected function membersChannel(): ?Channel
+    {
+        return $this->membersChannelId ? Channel::find($this->membersChannelId) : null;
+    }
+
+    public function addChannelMember(int $userId): void
+    {
+        $channel = $this->membersChannel();
+
+        if (! Auth::user()->isAdmin() || ! $channel) {
+            return;
+        }
+
+        $channel->users()->syncWithoutDetaching([$userId => ['role' => 'member']]);
+
+        ChannelMemberSuggestion::where('channel_id', $channel->id)
+            ->where('user_id', $userId)
+            ->where('status', 'pending')
+            ->update(['status' => 'approved']);
+    }
+
+    public function removeChannelMember(int $userId): void
+    {
+        $channel = $this->membersChannel();
+
+        if (! Auth::user()->isAdmin() || ! $channel) {
+            return;
+        }
+
+        if ($channel->created_by === $userId) {
+            $this->addError('members', 'Креаторот на каналот не може да се отстрани.');
+
+            return;
+        }
+
+        $channel->users()->detach($userId);
+
+        if ($userId === Auth::id() && $this->activeChannelId === $channel->id && ! $this->canAccessChannel($channel)) {
+            $this->closeChannelMembers();
+            $this->activeChannelId = $this->visibleChannels()->first()?->id;
+            $this->activeType = 'channel';
+        }
+    }
+
+    public function suggestMember(int $userId): void
+    {
+        $channel = $this->membersChannel();
+
+        if (! $channel || ! $this->canAccessChannel($channel) || $channel->hasMember($userId)) {
+            return;
+        }
+
+        ChannelMemberSuggestion::updateOrCreate(
+            ['channel_id' => $channel->id, 'user_id' => $userId],
+            ['suggested_by' => Auth::id(), 'status' => 'pending'],
+        );
+
+        $this->flash = 'Предлогот е испратен до администраторите.';
+        $this->dispatch('flash', message: $this->flash);
+    }
+
+    public function approveSuggestion(int $suggestionId): void
+    {
+        if (! Auth::user()->isAdmin()) {
+            return;
+        }
+
+        $suggestion = ChannelMemberSuggestion::findOrFail($suggestionId);
+
+        $suggestion->channel->users()->syncWithoutDetaching([
+            $suggestion->user_id => ['role' => 'member'],
+        ]);
+
+        $suggestion->update(['status' => 'approved']);
+    }
+
+    public function rejectSuggestion(int $suggestionId): void
+    {
+        if (! Auth::user()->isAdmin()) {
+            return;
+        }
+
+        ChannelMemberSuggestion::whereKey($suggestionId)->update(['status' => 'rejected']);
+    }
+
+    public function channelMemberRows()
+    {
+        $channel = $this->membersChannel();
+
+        return $channel ? $channel->users()->orderBy('name')->get() : collect();
+    }
+
+    public function channelCandidates()
+    {
+        $channel = $this->membersChannel();
+
+        if (! $channel) {
+            return collect();
+        }
+
+        $memberIds = $channel->users()->pluck('users.id');
+
+        return User::whereNotIn('id', $memberIds)->orderBy('name')->get();
+    }
+
+    public function channelPendingSuggestions()
+    {
+        $channel = $this->membersChannel();
+
+        if (! $channel) {
+            return collect();
+        }
+
+        return ChannelMemberSuggestion::with('user', 'suggestedBy')
+            ->where('channel_id', $channel->id)
+            ->where('status', 'pending')
+            ->latest()
+            ->get();
+    }
+
+    public function pendingSuggestionCountByChannel()
+    {
+        return ChannelMemberSuggestion::where('status', 'pending')
+            ->selectRaw('channel_id, count(*) as total')
+            ->groupBy('channel_id')
+            ->pluck('total', 'channel_id');
+    }
+
     public function openProfile(int $userId): void
     {
         $this->profileUserId = $userId;
@@ -549,6 +725,9 @@ class Chat extends Component
 
         $this->dispatch('unread-total', count: $total);
 
+        $showMembers = $this->showChannelMembers;
+        $pendingSuggestions = $showMembers ? $this->channelPendingSuggestions() : collect();
+
         return view('livewire.chat', [
             'channels' => $this->visibleChannels(),
             'colleagues' => $this->colleagues(),
@@ -559,6 +738,12 @@ class Chat extends Component
             'openUser' => $this->activeUser(),
             'profile' => $this->profileUser(),
             'totalUnread' => $total,
+            'membersChannel' => $showMembers ? $this->membersChannel() : null,
+            'memberRows' => $showMembers ? $this->channelMemberRows() : collect(),
+            'candidates' => $showMembers ? $this->channelCandidates() : collect(),
+            'pendingSuggestions' => $pendingSuggestions,
+            'suggestedUserIds' => $pendingSuggestions->pluck('user_id')->all(),
+            'pendingByChannel' => Auth::user()->isAdmin() ? $this->pendingSuggestionCountByChannel() : collect(),
         ]);
     }
 }

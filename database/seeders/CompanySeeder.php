@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Channel;
+use App\Models\ChannelMemberSuggestion;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -100,13 +101,22 @@ class CompanySeeder extends Seeder
         Message::create([
             'sender_id' => $admin->id,
             'receiver_id' => $employees[0]->id,
-            'body' => 'Марко, имаш ли слободни 10 минути за краток разговор?',
+            'body' => 'korisnik1, имаш ли слободни 10 минути за краток разговор?',
         ]);
 
         Message::create([
             'sender_id' => $employees[0]->id,
             'receiver_id' => $admin->id,
             'body' => 'Секако, слободен сум веднаш по ручек.',
+        ]);
+
+        $menadzment = $channels->firstWhere('name', 'menadzment');
+
+        ChannelMemberSuggestion::create([
+            'channel_id' => $menadzment->id,
+            'user_id' => $employees[1]->id,
+            'suggested_by' => $employees[0]->id,
+            'status' => 'pending',
         ]);
     }
 }

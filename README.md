@@ -42,12 +42,22 @@ The seeder creates a handful of users. The password for all of them is `password
 `#general`, `#random` and `#razvoj` are public channels; `#menadzment` is private.
 Anyone who registers is added to every public channel automatically.
 
+## Roles and channel membership
+
+The first account to register is an `admin`; everyone else is an `employee`.
+
+- Admins can promote or demote other admins from the profile popup.
+- Admins can add and remove channel members (the "Членови" button in a channel header),
+  and they can see every channel.
+- Any user can suggest a person for a channel from the same panel; the suggestion waits
+  for an admin to approve or reject it (admins see a badge on the channel).
+
 ## Email
 
-Locally `MAIL_MAILER=log`, so verification emails go to `storage/logs/laravel.log`
-and the `/email/verify` page shows a working verification link. For real delivery,
-fill in the SMTP block in `.env` (there is a Brevo example in `.env.example`). In
-production also set `QUEUE_CONNECTION=database` and run `php artisan queue:work`.
+Locally set `MAIL_MAILER=log` to write verification emails to
+`storage/logs/laravel.log` instead of sending them. For real delivery, fill in the SMTP
+block in `.env` (there is a Brevo example in `.env.example`). In production also set
+`QUEUE_CONNECTION=database` and run `php artisan queue:work`.
 
 ## Notes
 
