@@ -27,18 +27,18 @@
         setUnread(n) {
             document.title = (n > 0 ? '(' + n + ') ' : '') + this.baseTitle;
         },
-        lastPing: 0,
-        ping() {
+        lastActivityPing: 0,
+        reportActivity() {
             const now = Date.now();
-            if (now - this.lastPing > 45000) {
-                this.lastPing = now;
+            if (now - this.lastActivityPing > 45000) {
+                this.lastActivityPing = now;
                 this.$wire.reportActive();
             }
         }
      }"
      x-init="
         if (window.Notification && Notification.permission === 'default') { Notification.requestPermission(); }
-        ['mousemove', 'keydown', 'click', 'touchstart'].forEach(e => window.addEventListener(e, () => ping(), { passive: true }));
+        ['mousemove', 'keydown', 'click', 'touchstart'].forEach(e => window.addEventListener(e, () => reportActivity(), { passive: true }));
      "
      @dm-notification.window="addToast($event.detail)"
      @unread-total.window="setUnread($event.detail.count)"
