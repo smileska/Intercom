@@ -52,6 +52,19 @@ The first account to register is an `admin`; everyone else is an `employee`.
 - Any user can suggest a person for a channel from the same panel; the suggestion waits
   for an admin to approve or reject it (admins see a badge on the channel).
 
+## Chat
+
+- Messages can carry an image (paperclip in the composer, stored on the `public` disk —
+  run `php artisan storage:link`).
+- Any message can be reacted to: a quick bar of eight emoji on hover, or the full picker
+  behind the `＋`.
+- DMs show a "Видено" line once the other person has read your latest message; channels
+  show "Видено од N" under the last message.
+- Presence is online / away / do-not-disturb / invisible. It goes to *away* after two
+  minutes with no activity; you can also set it yourself from the menu under your name
+  ("Автоматски" hands control back). Do-not-disturb silences incoming toasts; invisible
+  shows you as offline to everyone else.
+
 ## Email
 
 Locally set `MAIL_MAILER=log` to write verification emails to

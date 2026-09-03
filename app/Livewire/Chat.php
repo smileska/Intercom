@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Channel;
 use App\Models\ChannelMemberSuggestion;
 use App\Models\Message;
+use App\Models\MessageReaction;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -73,13 +74,15 @@ class Chat extends Component
 
     public ?int $membersChannelId = null;
 
+    public $composerImage = null;
+
     public function mount(?Channel $initialChannel = null, ?User $initialUser = null): void
     {
         $this->notifiedThroughId = (int) (Message::whereNotNull('receiver_id')
             ->where('receiver_id', Auth::id())
             ->max('id') ?? 0);
 
-        $this->touchPresence();
+        User::whereKey(Auth::id())->update(['last_seen_at' => now(), 'last_active_at' => now()]);
 
         if ($initialUser && $initialUser->exists) {
             $this->activeType = 'dm';
@@ -92,6 +95,7 @@ class Chat extends Component
         if ($initialChannel && $initialChannel->exists && $this->canAccessChannel($initialChannel)) {
             $this->activeType = 'channel';
             $this->activeChannelId = $initialChannel->id;
+            $this->markChannelRead($initialChannel->id);
 
             return;
         }
@@ -204,7 +208,7 @@ class Chat extends Component
                 return collect();
             }
 
-            return Message::with('sender')
+            return Message::with('sender', 'reactions')
                 ->where('channel_id', $this->activeChannelId)
                 ->orderBy('created_at')
                 ->get();
@@ -214,7 +218,7 @@ class Chat extends Component
             $me = Auth::id();
             $them = $this->activeUserId;
 
-            return Message::with('sender')
+            return Message::with('sender', 'reactions')
                 ->where(function ($q) use ($me, $them) {
                     $q->where('sender_id', $me)->where('receiver_id', $them);
                 })
@@ -242,6 +246,13 @@ class Chat extends Component
         $this->activeChannelId = $channelId;
         $this->activeUserId = null;
         $this->resetEditing();
+        $this->markChannelRead($channelId);
+    }
+
+    protected function markChannelRead(int $channelId): void
+    {
+        Channel::find($channelId)?->users()
+            ->updateExistingPivot(Auth::id(), ['last_read_at' => now()]);
     }
 
     public function selectUser(int $userId): void
@@ -264,8 +275,25 @@ class Chat extends Component
     public function sendMessage(): void
     {
         $this->validate([
-            'newMessage' => ['required', 'string', 'max:5000'],
+            'newMessage' => ['nullable', 'string', 'max:5000'],
+            'composerImage' => ['nullable', 'image', 'max:5120'],
         ]);
+
+        if (trim($this->newMessage) === '' && ! $this->composerImage) {
+            $this->addError('newMessage', 'Напиши порака или прикачи слика.');
+
+            return;
+        }
+
+        $imagePath = $this->composerImage
+            ? $this->composerImage->store('chat-images', 'public')
+            : null;
+
+        $payload = [
+            'body' => $this->newMessage,
+            'image_path' => $imagePath,
+            'sender_id' => Auth::id(),
+        ];
 
         if ($this->activeType === 'channel' && $this->activeChannelId) {
             $channel = Channel::findOrFail($this->activeChannelId);
@@ -276,23 +304,59 @@ class Chat extends Component
                 return;
             }
 
-            Message::create([
-                'body' => $this->newMessage,
-                'sender_id' => Auth::id(),
-                'channel_id' => $channel->id,
-            ]);
+            Message::create($payload + ['channel_id' => $channel->id]);
         } elseif ($this->activeType === 'dm' && $this->activeUserId) {
-            Message::create([
-                'body' => $this->newMessage,
-                'sender_id' => Auth::id(),
-                'receiver_id' => $this->activeUserId,
-            ]);
+            Message::create($payload + ['receiver_id' => $this->activeUserId]);
         } else {
             return;
         }
 
         $this->newMessage = '';
+        $this->composerImage = null;
         $this->dispatch('message-sent');
+    }
+
+    public function toggleReaction(int $messageId, string $emoji): void
+    {
+        $emoji = trim($emoji);
+
+        if ($emoji === '' || mb_strlen($emoji) > 8) {
+            return;
+        }
+
+        $message = Message::find($messageId);
+
+        if (! $message || ! $this->canSeeMessage($message)) {
+            return;
+        }
+
+        $existing = MessageReaction::where('message_id', $messageId)
+            ->where('user_id', Auth::id())
+            ->where('emoji', $emoji)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+
+            return;
+        }
+
+        MessageReaction::create([
+            'message_id' => $messageId,
+            'user_id' => Auth::id(),
+            'emoji' => $emoji,
+        ]);
+    }
+
+    protected function canSeeMessage(Message $message): bool
+    {
+        if ($message->channel_id) {
+            $channel = Channel::find($message->channel_id);
+
+            return $channel && $this->canAccessChannel($channel);
+        }
+
+        return in_array(Auth::id(), [$message->sender_id, $message->receiver_id], true);
     }
 
     public function startEdit(int $messageId): void
@@ -561,6 +625,44 @@ class Chat extends Component
             ->pluck('total', 'channel_id');
     }
 
+    protected function channelSeenBy(): array
+    {
+        if ($this->activeType !== 'channel' || ! $this->activeChannelId) {
+            return ['count' => 0, 'users' => collect()];
+        }
+
+        $channel = $this->activeChannel();
+
+        $last = $channel
+            ? Message::where('channel_id', $channel->id)->orderByDesc('id')->first()
+            : null;
+
+        if (! $last) {
+            return ['count' => 0, 'users' => collect()];
+        }
+
+        $seers = $channel->users()
+            ->where('users.id', '!=', Auth::id())
+            ->where('users.id', '!=', $last->sender_id)
+            ->wherePivot('last_read_at', '>=', $last->created_at)
+            ->orderBy('name')
+            ->get();
+
+        return ['count' => $seers->count(), 'users' => $seers->take(5)];
+    }
+
+    protected function lastReadDmId(): ?int
+    {
+        if ($this->activeType !== 'dm' || ! $this->activeUserId) {
+            return null;
+        }
+
+        return Message::where('sender_id', Auth::id())
+            ->where('receiver_id', $this->activeUserId)
+            ->whereNotNull('read_at')
+            ->max('id');
+    }
+
     public function openProfile(int $userId): void
     {
         $this->profileUserId = $userId;
@@ -681,11 +783,26 @@ class Chat extends Component
         User::whereKey(Auth::id())->update(['last_seen_at' => now()]);
     }
 
+    public function setStatus(?string $status): void
+    {
+        if ($status !== null && ! in_array($status, User::STATUSES, true)) {
+            return;
+        }
+
+        Auth::user()->update(['status' => $status]);
+    }
+
+    public function reportActive(): void
+    {
+        User::whereKey(Auth::id())->update(['last_active_at' => now()]);
+    }
+
     public function heartbeat(): void
     {
         $this->touchPresence();
 
         $me = Auth::id();
+        $muted = Auth::user()->presence() === 'dnd';
 
         $incoming = Message::with('sender')
             ->whereNotNull('receiver_id')
@@ -699,7 +816,7 @@ class Chat extends Component
             foreach ($incoming as $msg) {
                 $viewingThisThread = $this->activeType === 'dm' && $this->activeUserId === $msg->sender_id;
 
-                if (! $viewingThisThread) {
+                if (! $viewingThisThread && ! $muted) {
                     $this->dispatch('dm-notification',
                         userId: $msg->sender_id,
                         name: $msg->sender->name,
@@ -716,6 +833,10 @@ class Chat extends Component
 
         if ($this->activeType === 'dm' && $this->activeUserId) {
             $this->markThreadRead($this->activeUserId);
+        }
+
+        if ($this->activeType === 'channel' && $this->activeChannelId) {
+            $this->markChannelRead($this->activeChannelId);
         }
     }
 
@@ -744,6 +865,10 @@ class Chat extends Component
             'pendingSuggestions' => $pendingSuggestions,
             'suggestedUserIds' => $pendingSuggestions->pluck('user_id')->all(),
             'pendingByChannel' => Auth::user()->isAdmin() ? $this->pendingSuggestionCountByChannel() : collect(),
+            'quickEmojis' => config('emojis.quick'),
+            'emojiList' => config('emojis.all'),
+            'channelSeenBy' => $this->channelSeenBy(),
+            'lastReadDmId' => $this->lastReadDmId(),
         ]);
     }
 }

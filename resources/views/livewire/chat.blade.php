@@ -26,34 +26,74 @@
         },
         setUnread(n) {
             document.title = (n > 0 ? '(' + n + ') ' : '') + this.baseTitle;
+        },
+        lastPing: 0,
+        ping() {
+            const now = Date.now();
+            if (now - this.lastPing > 45000) {
+                this.lastPing = now;
+                this.$wire.reportActive();
+            }
         }
      }"
-     x-init="if (window.Notification && Notification.permission === 'default') { Notification.requestPermission(); }"
+     x-init="
+        if (window.Notification && Notification.permission === 'default') { Notification.requestPermission(); }
+        ['mousemove', 'keydown', 'click', 'touchstart'].forEach(e => window.addEventListener(e, () => ping(), { passive: true }));
+     "
      @dm-notification.window="addToast($event.detail)"
      @unread-total.window="setUnread($event.detail.count)"
      wire:poll.3s="heartbeat">
 
     <aside class="w-72 shrink-0 bg-[#3F0E40] text-gray-200 flex flex-col dark:bg-[#1a0b1b]">
-        <div class="px-4 py-4 border-b border-white/10 flex items-center justify-between gap-2">
-            <button type="button" wire:click="openProfile({{ auth()->id() }})"
-                    class="flex items-center gap-2 min-w-0 text-left group">
-                <x-avatar :user="auth()->user()" :presence="true" class="h-9 w-9 text-xs" />
-                <span class="min-w-0">
-                    <span class="block font-bold text-white leading-tight truncate">{{ config('app.name') }}</span>
-                    <span class="block text-xs text-purple-300 truncate group-hover:underline">{{ auth()->user()->name }}</span>
-                </span>
-            </button>
-            <div class="flex items-center gap-1 shrink-0">
-                <x-theme-toggle class="text-purple-200 hover:bg-white/10" />
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" title="Одјава"
-                            class="inline-flex h-8 w-8 items-center justify-center rounded-md text-purple-200 hover:bg-white/10">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H3m0 0 4-4m-4 4 4 4m6-11h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"></path>
-                        </svg>
-                    </button>
-                </form>
+        <div class="px-4 py-4 border-b border-white/10">
+            <div class="flex items-center justify-between gap-2">
+                <button type="button" wire:click="openProfile({{ auth()->id() }})"
+                        class="flex items-center gap-2 min-w-0 text-left group">
+                    <x-avatar :user="auth()->user()" :presence="true" class="h-9 w-9 text-xs" />
+                    <span class="min-w-0">
+                        <span class="block font-bold text-white leading-tight truncate">{{ config('app.name') }}</span>
+                        <span class="block text-xs text-purple-300 truncate group-hover:underline">{{ auth()->user()->name }}</span>
+                    </span>
+                </button>
+                <div class="flex items-center gap-1 shrink-0">
+                    <x-theme-toggle class="text-purple-200 hover:bg-white/10" />
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" title="Одјава"
+                                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-purple-200 hover:bg-white/10">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H3m0 0 4-4m-4 4 4 4m6-11h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-4"></path>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            @php
+                $me = auth()->user();
+                $dotClass = [
+                    'online' => 'bg-green-500', 'away' => 'bg-amber-400', 'dnd' => 'bg-red-500',
+                    'invisible' => 'bg-gray-400 ring-1 ring-gray-400', 'offline' => 'bg-gray-500',
+                ][$me->presence(auth()->id())];
+            @endphp
+            <div class="relative mt-2" x-data="{ open: false }" @keydown.escape="open = false">
+                <button type="button" @click="open = !open"
+                        class="flex w-full items-center gap-2 rounded-md bg-white/5 px-2 py-1.5 text-xs text-purple-100 hover:bg-white/10">
+                    <span class="h-2.5 w-2.5 rounded-full {{ $dotClass }}"></span>
+                    <span>{{ $me->presenceLabel(auth()->id()) }}</span>
+                    <svg class="ml-auto h-3 w-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"></path>
+                    </svg>
+                </button>
+                <div x-show="open" @click.outside="open = false" x-transition style="display:none"
+                     class="absolute left-0 right-0 z-30 mt-1 overflow-hidden rounded-md bg-white py-1 text-sm text-gray-700 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/10">
+                    <button wire:click="setStatus('online')" @click="open = false" class="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"><span class="h-2.5 w-2.5 rounded-full bg-green-500"></span> Активен</button>
+                    <button wire:click="setStatus('away')" @click="open = false" class="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span> Отсутен</button>
+                    <button wire:click="setStatus('dnd')" @click="open = false" class="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"><span class="h-2.5 w-2.5 rounded-full bg-red-500"></span> Не вознемирувај</button>
+                    <button wire:click="setStatus('invisible')" @click="open = false" class="flex w-full items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700"><span class="h-2.5 w-2.5 rounded-full bg-gray-400 ring-1 ring-gray-400"></span> Невидлив</button>
+                    <div class="my-1 border-t border-gray-100 dark:border-gray-700"></div>
+                    <button wire:click="setStatus(null)" @click="open = false" class="flex w-full items-center gap-2 px-3 py-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700">↺ Автоматски</button>
+                </div>
             </div>
         </div>
 
@@ -174,7 +214,7 @@
                     <div class="text-left">
                         <h2 class="font-semibold text-gray-800 group-hover:underline dark:text-gray-100">{{ $openUser->name }}</h2>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ $openUser->isOnline() ? 'онлајн' : ($openUser->title ?: 'офлајн') }}
+                            {{ $openUser->presenceLabel() }}@if ($openUser->title) · {{ $openUser->title }}@endif
                         </p>
                     </div>
                 </button>
@@ -220,40 +260,103 @@
                                 <button type="button" wire:click="cancelEdit" class="text-xs text-gray-500">Откажи</button>
                             </form>
                         @else
-                            <p class="text-sm text-gray-700 whitespace-pre-wrap break-words dark:text-gray-300">{{ $message->body }}</p>
+                            @if (filled($message->body))
+                                <p class="text-sm text-gray-700 whitespace-pre-wrap break-words dark:text-gray-300">{{ $message->body }}</p>
+                            @endif
+
+                            @if ($message->imageUrl())
+                                <a href="{{ $message->imageUrl() }}" target="_blank" rel="noopener" class="mt-1 block w-fit">
+                                    <img src="{{ $message->imageUrl() }}" alt="слика"
+                                         class="max-h-64 max-w-xs rounded-lg border border-gray-200 object-cover dark:border-gray-700">
+                                </a>
+                            @endif
+
+                            @if ($message->reactions->isNotEmpty())
+                                <div class="mt-1 flex flex-wrap gap-1">
+                                    @foreach ($message->reactions->groupBy('emoji') as $emoji => $rs)
+                                        <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $emoji }}')"
+                                                class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs
+                                                       {{ $rs->contains('user_id', auth()->id())
+                                                          ? 'border-[#4A154B] bg-[#4A154B]/10 text-[#4A154B] dark:border-purple-400 dark:text-purple-300'
+                                                          : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700' }}">
+                                            <span>{{ $emoji }}</span><span>{{ $rs->count() }}</span>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            @endif
                         @endif
                     </div>
 
-                    @if ($message->sender_id === auth()->id() && $editingMessageId !== $message->id)
-                        <div class="opacity-0 group-hover:opacity-100 flex items-start gap-2 text-xs">
-                            <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
-                            <button wire:click="deleteMessage({{ $message->id }})"
-                                    wire:confirm="Да се избрише пораката?"
-                                    class="text-gray-400 hover:text-red-600">🗑</button>
+                    @if ($editingMessageId !== $message->id)
+                        <div class="opacity-0 group-hover:opacity-100 flex items-start gap-1.5 text-xs" x-data="{ react: false }">
+                            <div class="relative">
+                                <button type="button" @click="react = !react" title="Реакција"
+                                        class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">🙂</button>
+                                <div x-show="react" @click.outside="react = false" x-transition style="display:none"
+                                     class="absolute right-0 top-6 z-20 flex items-center gap-1 rounded-lg bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
+                                    @foreach ($quickEmojis as $qe)
+                                        <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $qe }}')" @click="react = false"
+                                                class="h-7 w-7 rounded text-base hover:bg-gray-100 dark:hover:bg-gray-700">{{ $qe }}</button>
+                                    @endforeach
+                                    <button type="button" @click="react = false; $dispatch('open-emoji-picker', { messageId: {{ $message->id }} })"
+                                            class="h-7 w-7 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">＋</button>
+                                </div>
+                            </div>
+                            @if ($message->sender_id === auth()->id())
+                                <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
+                                <button wire:click="deleteMessage({{ $message->id }})"
+                                        wire:confirm="Да се избрише пораката?"
+                                        class="text-gray-400 hover:text-red-600">🗑</button>
+                            @endif
                         </div>
                     @endif
                 </div>
             @empty
                 <p class="text-sm text-gray-400">Сè уште нема пораки. Испрати ја првата! 👋</p>
             @endforelse
+
+            @if ($activeType === 'dm' && $lastReadDmId)
+                <p class="pr-1 text-right text-[11px] text-gray-400">Видено</p>
+            @endif
+
+            @if ($activeType === 'channel' && $channelSeenBy['count'] > 0)
+                <div class="flex items-center justify-end gap-1 pr-1 text-[11px] text-gray-400"
+                     title="{{ $channelSeenBy['users']->pluck('name')->implode(', ') }}">
+                    @foreach ($channelSeenBy['users'] as $seer)
+                        <x-avatar :user="$seer" class="h-4 w-4 text-[8px]" />
+                    @endforeach
+                    <span>Видено од {{ $channelSeenBy['count'] }}</span>
+                </div>
+            @endif
         </div>
 
         @if (($activeType === 'channel' && $openChannel) || ($activeType === 'dm' && $openUser))
-            <form wire:submit.prevent="sendMessage" class="border-t px-6 py-3 flex items-center gap-3 dark:border-gray-700">
-                <input
-                    type="text"
-                    wire:model="newMessage"
-                    placeholder="Напиши порака..."
-                    autocomplete="off"
-                    class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[#4A154B] focus:ring-[#4A154B] text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                >
-                <button type="submit" class="rounded-md bg-[#4A154B] px-4 py-2 text-sm font-medium text-white hover:bg-[#3a1039]">
-                    Испрати
-                </button>
+            <form wire:submit.prevent="sendMessage" class="border-t px-6 py-3 dark:border-gray-700">
+                @if ($composerImage)
+                    <div class="mb-2 flex items-center gap-2">
+                        <img src="{{ $composerImage->temporaryUrl() }}" class="h-16 w-16 rounded-lg border object-cover dark:border-gray-700">
+                        <button type="button" wire:click="$set('composerImage', null)" class="text-xs text-gray-500 hover:text-red-600">Отстрани</button>
+                    </div>
+                @endif
+                <div wire:loading wire:target="composerImage" class="mb-1 text-xs text-gray-400">Се вчитува сликата…</div>
+
+                <div class="flex items-center gap-3">
+                    <label class="cursor-pointer text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" title="Прикачи слика">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.12 18.32a1.5 1.5 0 0 1-2.12-2.12l8.49-8.49"></path>
+                        </svg>
+                        <input type="file" wire:model="composerImage" accept="image/*" class="hidden">
+                    </label>
+                    <input type="text" wire:model="newMessage" placeholder="Напиши порака..." autocomplete="off"
+                           class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[#4A154B] focus:ring-[#4A154B] text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
+                    <button type="submit" class="rounded-md bg-[#4A154B] px-4 py-2 text-sm font-medium text-white hover:bg-[#3a1039]">
+                        Испрати
+                    </button>
+                </div>
+
+                @error('newMessage') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+                @error('composerImage') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
             </form>
-            @error('newMessage')
-                <p class="px-6 pb-2 text-xs text-red-600">{{ $message }}</p>
-            @enderror
         @endif
     </main>
 
@@ -396,9 +499,16 @@
                         <button wire:click="closeProfile" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl">✕</button>
                     </div>
 
+                    @php
+                        $profileDot = [
+                            'online' => 'bg-green-500', 'away' => 'bg-amber-400', 'dnd' => 'bg-red-500',
+                            'invisible' => 'bg-gray-400 ring-1 ring-gray-400', 'offline' => 'bg-gray-400',
+                        ][$profile->presence(auth()->id())];
+                    @endphp
                     <h3 class="mt-3 text-lg font-bold text-gray-900 dark:text-gray-100">{{ $profile->name }}</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ $profile->isOnline() ? '🟢 онлајн' : '⚪ офлајн' }}
+                    <p class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                        <span class="h-2.5 w-2.5 rounded-full {{ $profileDot }}"></span>
+                        {{ $profile->presenceLabel(auth()->id()) }}
                         @if ($profile->title) · {{ $profile->title }} @endif
                     </p>
 
@@ -572,5 +682,35 @@
          class="fixed top-4 left-1/2 -translate-x-1/2 z-[70] rounded-md bg-green-600 px-4 py-2 text-sm text-white shadow-lg"
          style="display: none;">
         <span x-text="msg"></span>
+    </div>
+
+    <div x-data="{
+            open: false,
+            messageId: null,
+            q: '',
+            emojis: @js($emojiList),
+            get filtered() {
+                const s = this.q.trim().toLowerCase();
+                return s ? this.emojis.filter(x => x.k.includes(s)) : this.emojis;
+            }
+         }"
+         @open-emoji-picker.window="open = true; messageId = $event.detail.messageId; q = ''; $nextTick(() => $refs.q && $refs.q.focus())"
+         @keydown.escape.window="open = false"
+         x-show="open" style="display:none"
+         class="fixed inset-0 z-[80] flex items-start justify-center bg-black/30 p-4 pt-24"
+         @click.self="open = false">
+        <div class="w-full max-w-sm rounded-lg bg-white shadow-2xl dark:bg-gray-800">
+            <div class="border-b p-3 dark:border-gray-700">
+                <input x-ref="q" x-model="q" type="text" placeholder="Пребарај емоџи..."
+                       class="w-full rounded-md border-gray-300 text-sm focus:border-[#4A154B] focus:ring-[#4A154B] dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
+            </div>
+            <div class="grid max-h-64 grid-cols-8 gap-1 overflow-y-auto p-2">
+                <template x-for="x in filtered" :key="x.e">
+                    <button type="button" x-text="x.e"
+                            @click="$wire.toggleReaction(messageId, x.e); open = false"
+                            class="h-8 w-8 rounded text-lg hover:bg-gray-100 dark:hover:bg-gray-700"></button>
+                </template>
+            </div>
+        </div>
     </div>
 </div>
