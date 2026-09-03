@@ -46,11 +46,12 @@ Anyone who registers is added to every public channel automatically.
 
 The first account to register is an `admin`; everyone else is an `employee`.
 
+- **Private channels are admin-only** — they don't appear at all for non-admins. Admins see
+  and can post in every channel, public or private.
 - Admins can promote or demote other admins from the profile popup.
-- Admins can add and remove channel members (the "Членови" button in a channel header),
-  and they can see every channel.
-- Any user can suggest a person for a channel from the same panel; the suggestion waits
-  for an admin to approve or reject it (admins see a badge on the channel).
+- Admins can add and remove channel members from the "Членови" button in a channel header.
+- On a public channel, any user can suggest a person for membership from that panel; an
+  admin approves or rejects it (a badge shows on the channel while one is pending).
 
 ## Chat
 

@@ -66,9 +66,7 @@ class CompanySeeder extends Seeder
             ]);
 
             if ($data['private']) {
-
                 $channel->users()->attach($admin->id, ['role' => 'owner']);
-                $channel->users()->attach($employees->first()->id, ['role' => 'member']);
             } else {
                 $channel->users()->attach($allUsers->pluck('id')->toArray(), ['role' => 'member']);
             }
@@ -110,11 +108,11 @@ class CompanySeeder extends Seeder
             'body' => 'Секако, слободен сум веднаш по ручек.',
         ]);
 
-        $menadzment = $channels->firstWhere('name', 'menadzment');
+        $razvoj->users()->detach($employees[4]->id);
 
         ChannelMemberSuggestion::create([
-            'channel_id' => $menadzment->id,
-            'user_id' => $employees[1]->id,
+            'channel_id' => $razvoj->id,
+            'user_id' => $employees[4]->id,
             'suggested_by' => $employees[0]->id,
             'status' => 'pending',
         ]);

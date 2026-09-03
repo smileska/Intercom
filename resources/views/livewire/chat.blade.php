@@ -277,47 +277,44 @@
                                 </a>
                             @endif
 
-                            @if ($message->reactions->isNotEmpty())
-                                <div class="mt-2 flex flex-wrap gap-1.5">
-                                    @foreach ($message->reactions->groupBy('emoji') as $emoji => $rs)
-                                        <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $emoji }}')"
-                                                wire:key="rx-{{ $message->id }}-{{ $emoji }}"
-                                                class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm leading-none transition
-                                                       {{ $rs->contains('user_id', auth()->id())
-                                                          ? 'border-[#4A154B] bg-[#4A154B]/10 text-[#4A154B] dark:border-purple-400 dark:bg-purple-400/10 dark:text-purple-200'
-                                                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300' }}">
-                                            <span class="text-[17px]">{{ $emoji }}</span>
-                                            <span class="text-xs font-semibold tabular-nums">{{ $rs->count() }}</span>
-                                        </button>
-                                    @endforeach
+                            <div class="mt-2 flex-wrap items-center gap-1.5 {{ $message->reactions->isNotEmpty() ? 'flex' : 'hidden group-hover:flex' }}">
+                                @foreach ($message->reactions->groupBy('emoji') as $emoji => $rs)
+                                    <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $emoji }}')"
+                                            wire:key="rx-{{ $message->id }}-{{ $emoji }}"
+                                            class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm leading-none transition
+                                                   {{ $rs->contains('user_id', auth()->id())
+                                                      ? 'border-[#4A154B] bg-[#4A154B]/10 text-[#4A154B] dark:border-purple-400 dark:bg-purple-400/10 dark:text-purple-200'
+                                                      : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300' }}">
+                                        <span class="text-[17px]">{{ $emoji }}</span>
+                                        <span class="text-xs font-semibold tabular-nums">{{ $rs->count() }}</span>
+                                    </button>
+                                @endforeach
+
+                                <div class="relative" x-data="{ react: false }" wire:key="react-{{ $message->id }}">
+                                    <button type="button" @click="react = !react" title="Додади реакција"
+                                            class="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-2 py-1 text-sm leading-none text-gray-500 transition hover:border-gray-300 hover:text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+                                        <span class="text-base">🙂</span><span class="text-xs">+</span>
+                                    </button>
+                                    <div x-show="react" @click.outside="react = false" x-transition style="display:none"
+                                         class="absolute left-0 bottom-full mb-1 z-20 flex items-center gap-1 rounded-lg bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
+                                        @foreach ($quickEmojis as $qe)
+                                            <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $qe }}')" @click="react = false"
+                                                    class="h-8 w-8 rounded text-lg hover:bg-gray-100 dark:hover:bg-gray-700">{{ $qe }}</button>
+                                        @endforeach
+                                        <button type="button" @click="react = false; $dispatch('open-emoji-picker', { messageId: {{ $message->id }} })"
+                                                class="h-8 w-8 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">＋</button>
+                                    </div>
                                 </div>
-                            @endif
+                            </div>
                         @endif
                     </div>
 
-                    @if ($editingMessageId !== $message->id)
-                        <div class="flex items-start gap-1 text-sm" x-data="{ react: false }">
-                            <div class="relative">
-                                <button type="button" @click="react = !react" title="Реакција"
-                                        class="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-sm opacity-60 transition hover:bg-gray-100 group-hover:opacity-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700">🙂</button>
-                                <div x-show="react" @click.outside="react = false" x-transition style="display:none"
-                                     class="absolute right-0 top-9 z-20 flex items-center gap-1 rounded-lg bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
-                                    @foreach ($quickEmojis as $qe)
-                                        <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $qe }}')" @click="react = false"
-                                                class="h-8 w-8 rounded text-lg hover:bg-gray-100 dark:hover:bg-gray-700">{{ $qe }}</button>
-                                    @endforeach
-                                    <button type="button" @click="react = false; $dispatch('open-emoji-picker', { messageId: {{ $message->id }} })"
-                                            class="h-8 w-8 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">＋</button>
-                                </div>
-                            </div>
-                            @if ($message->sender_id === auth()->id())
-                                <div class="flex items-start gap-1.5 opacity-0 transition group-hover:opacity-100">
-                                    <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
-                                    <button wire:click="deleteMessage({{ $message->id }})"
-                                            wire:confirm="Да се избрише пораката?"
-                                            class="text-gray-400 hover:text-red-600">🗑</button>
-                                </div>
-                            @endif
+                    @if ($editingMessageId !== $message->id && $message->sender_id === auth()->id())
+                        <div class="flex items-start gap-1.5 text-xs opacity-0 transition group-hover:opacity-100">
+                            <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
+                            <button wire:click="deleteMessage({{ $message->id }})"
+                                    wire:confirm="Да се избрише пораката?"
+                                    class="text-gray-400 hover:text-red-600">🗑</button>
                         </div>
                     @endif
                 </div>

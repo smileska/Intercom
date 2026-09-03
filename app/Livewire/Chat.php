@@ -106,9 +106,7 @@ class Chat extends Component
 
     protected function canAccessChannel(Channel $channel): bool
     {
-        return Auth::user()->isAdmin()
-            || ! $channel->is_private
-            || $channel->hasMember(Auth::id());
+        return Auth::user()->isAdmin() || ! $channel->is_private;
     }
 
     public function visibleChannels()
@@ -117,13 +115,7 @@ class Chat extends Component
             return Channel::orderBy('name')->get();
         }
 
-        return Channel::query()
-            ->where(function ($q) {
-                $q->where('is_private', false)
-                    ->orWhereHas('users', fn ($q2) => $q2->where('users.id', Auth::id()));
-            })
-            ->orderBy('name')
-            ->get();
+        return Channel::where('is_private', false)->orderBy('name')->get();
     }
 
     public function colleagues()
@@ -554,7 +546,7 @@ class Chat extends Component
     {
         $channel = $this->openMembersModalChannel($channelId);
 
-        if (! $channel || ! $this->canAccessChannel($channel) || $channel->hasMember($userId)) {
+        if (! $channel || $channel->is_private || ! $this->canAccessChannel($channel) || $channel->hasMember($userId)) {
             return;
         }
 
@@ -615,7 +607,7 @@ class Chat extends Component
     {
         $channel = $this->membersChannel();
 
-        if (! $channel) {
+        if (! $channel || $channel->is_private) {
             return collect();
         }
 
@@ -629,6 +621,7 @@ class Chat extends Component
     public function pendingSuggestionCountByChannel()
     {
         return ChannelMemberSuggestion::where('status', 'pending')
+            ->whereHas('channel', fn ($q) => $q->where('is_private', false))
             ->selectRaw('channel_id, count(*) as total')
             ->groupBy('channel_id')
             ->pluck('total', 'channel_id');
