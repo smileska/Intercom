@@ -5,7 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 
 class Message extends Model
 {
@@ -13,6 +15,7 @@ class Message extends Model
 
     protected $fillable = [
         'body',
+        'image_path',
         'sender_id',
         'channel_id',
         'receiver_id',
@@ -40,8 +43,20 @@ class Message extends Model
         return $this->belongsTo(Channel::class);
     }
 
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class);
+    }
+
     public function isDirectMessage(): bool
     {
         return ! is_null($this->receiver_id);
+    }
+
+    public function imageUrl(): ?string
+    {
+        return $this->image_path
+            ? Storage::disk('public')->url($this->image_path)
+            : null;
     }
 }
