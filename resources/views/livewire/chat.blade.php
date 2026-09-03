@@ -278,14 +278,16 @@
                             @endif
 
                             @if ($message->reactions->isNotEmpty())
-                                <div class="mt-1 flex flex-wrap gap-1">
+                                <div class="mt-2 flex flex-wrap gap-1.5">
                                     @foreach ($message->reactions->groupBy('emoji') as $emoji => $rs)
                                         <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $emoji }}')"
-                                                class="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs
+                                                wire:key="rx-{{ $message->id }}-{{ $emoji }}"
+                                                class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm leading-none transition
                                                        {{ $rs->contains('user_id', auth()->id())
-                                                          ? 'border-[#4A154B] bg-[#4A154B]/10 text-[#4A154B] dark:border-purple-400 dark:text-purple-300'
-                                                          : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700' }}">
-                                            <span>{{ $emoji }}</span><span>{{ $rs->count() }}</span>
+                                                          ? 'border-[#4A154B] bg-[#4A154B]/10 text-[#4A154B] dark:border-purple-400 dark:bg-purple-400/10 dark:text-purple-200'
+                                                          : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 dark:border-gray-600 dark:bg-gray-700/50 dark:text-gray-300' }}">
+                                            <span class="text-[17px]">{{ $emoji }}</span>
+                                            <span class="text-xs font-semibold tabular-nums">{{ $rs->count() }}</span>
                                         </button>
                                     @endforeach
                                 </div>
@@ -294,25 +296,27 @@
                     </div>
 
                     @if ($editingMessageId !== $message->id)
-                        <div class="opacity-0 group-hover:opacity-100 flex items-start gap-1.5 text-xs" x-data="{ react: false }">
+                        <div class="flex items-start gap-1 text-sm" x-data="{ react: false }">
                             <div class="relative">
                                 <button type="button" @click="react = !react" title="Реакција"
-                                        class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">🙂</button>
+                                        class="flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white text-sm opacity-60 transition hover:bg-gray-100 group-hover:opacity-100 dark:border-gray-600 dark:bg-gray-800 dark:hover:bg-gray-700">🙂</button>
                                 <div x-show="react" @click.outside="react = false" x-transition style="display:none"
-                                     class="absolute right-0 top-6 z-20 flex items-center gap-1 rounded-lg bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
+                                     class="absolute right-0 top-9 z-20 flex items-center gap-1 rounded-lg bg-white p-1.5 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
                                     @foreach ($quickEmojis as $qe)
                                         <button type="button" wire:click="toggleReaction({{ $message->id }}, '{{ $qe }}')" @click="react = false"
-                                                class="h-7 w-7 rounded text-base hover:bg-gray-100 dark:hover:bg-gray-700">{{ $qe }}</button>
+                                                class="h-8 w-8 rounded text-lg hover:bg-gray-100 dark:hover:bg-gray-700">{{ $qe }}</button>
                                     @endforeach
                                     <button type="button" @click="react = false; $dispatch('open-emoji-picker', { messageId: {{ $message->id }} })"
-                                            class="h-7 w-7 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">＋</button>
+                                            class="h-8 w-8 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">＋</button>
                                 </div>
                             </div>
                             @if ($message->sender_id === auth()->id())
-                                <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
-                                <button wire:click="deleteMessage({{ $message->id }})"
-                                        wire:confirm="Да се избрише пораката?"
-                                        class="text-gray-400 hover:text-red-600">🗑</button>
+                                <div class="flex items-start gap-1.5 opacity-0 transition group-hover:opacity-100">
+                                    <button wire:click="startEdit({{ $message->id }})" class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">✎</button>
+                                    <button wire:click="deleteMessage({{ $message->id }})"
+                                            wire:confirm="Да се избрише пораката?"
+                                            class="text-gray-400 hover:text-red-600">🗑</button>
+                                </div>
                             @endif
                         </div>
                     @endif
@@ -395,7 +399,7 @@
                             <label class="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">Членови</label>
                             <div class="max-h-32 overflow-y-auto border rounded-md p-2 space-y-1 dark:border-gray-600">
                                 @foreach ($colleagues as $colleague)
-                                    <label class="flex items-center gap-2 text-sm dark:text-gray-300">
+                                    <label class="flex items-center gap-2 text-sm dark:text-gray-300" wire:key="newch-{{ $colleague->id }}">
                                         <input type="checkbox"
                                                value="{{ $colleague->id }}"
                                                wire:click="toggleMember({{ $colleague->id }})"
@@ -431,14 +435,14 @@
 
                 <ul class="space-y-1 mb-5">
                     @foreach ($memberRows as $member)
-                        <li class="flex items-center gap-2 text-sm">
+                        <li class="flex items-center gap-2 text-sm" wire:key="mem-{{ $membersChannel->id }}-{{ $member->id }}">
                             <x-avatar :user="$member" class="h-6 w-6 text-[10px]" />
                             <span class="truncate text-gray-700 dark:text-gray-200">{{ $member->name }}</span>
                             @if ($member->id === $membersChannel->created_by)
                                 <span class="text-[10px] text-gray-400">(креатор)</span>
                             @endif
                             @if (auth()->user()->isAdmin() && $member->id !== $membersChannel->created_by)
-                                <button wire:click="removeChannelMember({{ $member->id }})"
+                                <button wire:click="removeChannelMember({{ $membersChannel->id }}, {{ $member->id }})"
                                         class="ml-auto text-gray-400 hover:text-red-600" title="Отстрани од каналот">✕</button>
                             @endif
                         </li>
@@ -450,7 +454,7 @@
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">Предлози на чекање</p>
                         <ul class="space-y-2">
                             @foreach ($pendingSuggestions as $suggestion)
-                                <li class="flex items-center gap-2 text-sm">
+                                <li class="flex items-center gap-2 text-sm" wire:key="sug-{{ $suggestion->id }}">
                                     <x-avatar :user="$suggestion->user" class="h-6 w-6 text-[10px]" />
                                     <span class="min-w-0">
                                         <span class="block truncate text-gray-700 dark:text-gray-200">{{ $suggestion->user->name }}</span>
@@ -474,16 +478,16 @@
                     </p>
                     <ul class="space-y-1 max-h-52 overflow-y-auto">
                         @foreach ($candidates as $person)
-                            <li class="flex items-center gap-2 text-sm">
+                            <li class="flex items-center gap-2 text-sm" wire:key="cand-{{ $membersChannel->id }}-{{ $person->id }}">
                                 <x-avatar :user="$person" class="h-6 w-6 text-[10px]" />
                                 <span class="truncate text-gray-700 dark:text-gray-200">{{ $person->name }}</span>
                                 @if (auth()->user()->isAdmin())
-                                    <button wire:click="addChannelMember({{ $person->id }})"
+                                    <button wire:click="addChannelMember({{ $membersChannel->id }}, {{ $person->id }})"
                                             class="ml-auto rounded bg-[#4A154B] px-2 py-1 text-[11px] font-medium text-white hover:bg-[#3a1039]">Додади</button>
                                 @elseif (in_array($person->id, $suggestedUserIds))
                                     <span class="ml-auto text-[11px] text-gray-400">Предложено</span>
                                 @else
-                                    <button wire:click="suggestMember({{ $person->id }})"
+                                    <button wire:click="suggestMember({{ $membersChannel->id }}, {{ $person->id }})"
                                             class="ml-auto rounded border border-[#4A154B] px-2 py-1 text-[11px] font-medium text-[#4A154B] hover:bg-[#4A154B]/10 dark:border-purple-400 dark:text-purple-300">Предложи</button>
                                 @endif
                             </li>

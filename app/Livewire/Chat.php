@@ -502,9 +502,18 @@ class Chat extends Component
         return $this->membersChannelId ? Channel::find($this->membersChannelId) : null;
     }
 
-    public function addChannelMember(int $userId): void
+    protected function openMembersModalChannel(int $channelId): ?Channel
     {
-        $channel = $this->membersChannel();
+        if ($channelId !== $this->membersChannelId) {
+            return null;
+        }
+
+        return Channel::find($channelId);
+    }
+
+    public function addChannelMember(int $channelId, int $userId): void
+    {
+        $channel = $this->openMembersModalChannel($channelId);
 
         if (! Auth::user()->isAdmin() || ! $channel) {
             return;
@@ -518,9 +527,9 @@ class Chat extends Component
             ->update(['status' => 'approved']);
     }
 
-    public function removeChannelMember(int $userId): void
+    public function removeChannelMember(int $channelId, int $userId): void
     {
-        $channel = $this->membersChannel();
+        $channel = $this->openMembersModalChannel($channelId);
 
         if (! Auth::user()->isAdmin() || ! $channel) {
             return;
@@ -541,9 +550,9 @@ class Chat extends Component
         }
     }
 
-    public function suggestMember(int $userId): void
+    public function suggestMember(int $channelId, int $userId): void
     {
-        $channel = $this->membersChannel();
+        $channel = $this->openMembersModalChannel($channelId);
 
         if (! $channel || ! $this->canAccessChannel($channel) || $channel->hasMember($userId)) {
             return;
