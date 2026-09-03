@@ -202,8 +202,14 @@
                         <span class="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded dark:bg-gray-800 dark:text-gray-400">🔒 приватен канал</span>
                     @endif
                     <button wire:click="openChannelMembers({{ $openChannel->id }})"
-                            class="text-xs rounded-md border border-gray-300 px-2.5 py-1 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
+                            class="inline-flex items-center gap-1.5 text-xs rounded-md border border-gray-300 px-2.5 py-1 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800">
                         👥 Членови
+                        @if ($pendingByChannel->get($openChannel->id, 0) > 0)
+                            <span class="inline-flex min-w-[1.125rem] justify-center rounded-full bg-amber-500 px-1 py-0.5 text-[10px] font-bold text-white"
+                                  title="Предлози за членство на чекање">
+                                {{ $pendingByChannel->get($openChannel->id) }}
+                            </span>
+                        @endif
                     </button>
                 </div>
             </header>
@@ -236,8 +242,8 @@
         scrollToBottom();
         new MutationObserver(scrollToBottom).observe($el, { childList: true, subtree: true });">
             @forelse ($messages as $message)
-                <div class="flex gap-3 group" wire:key="msg-{{ $message->id }}">
-                    <button type="button" wire:click="openProfile({{ $message->sender_id }})" class="shrink-0">
+                <div class="flex items-start gap-3 group" wire:key="msg-{{ $message->id }}">
+                    <button type="button" wire:click="openProfile({{ $message->sender_id }})" class="shrink-0 self-start">
                         <x-avatar :user="$message->sender" class="h-9 w-9 text-xs" />
                     </button>
                     <div class="min-w-0 flex-1">
